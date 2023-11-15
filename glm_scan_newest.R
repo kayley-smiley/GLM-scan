@@ -1,3 +1,5 @@
+#test by adding a space
+
 #glm scan test with closed form solution for alternative glms
 
 #try changing apply functions to parapply for parallel computing
