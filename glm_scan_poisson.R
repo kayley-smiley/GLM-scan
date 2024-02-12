@@ -1,8 +1,8 @@
-#glm scan test with closed form solution for alternative glms
+#glm scan test with closed form solutions for alternative glms
 
 
-#function for creating the matrix indicating which regions are in which zones
-#number of columns = number of zones, number of rows = number of regions
+#function for creating a matrix indicating which regions are in which zones
+#the number of columns = number of zones, the number of rows = number of regions
 zones2ind <- function(zones, nregions) {
   ilist <- lapply(zones, function(x) {
     u <- numeric(nregions)
@@ -27,11 +27,10 @@ glm_scan_stat <- function(cases,
   #setup
   
   #indicator for test statistic
-  #why is this using ein? 
   tstat_ind <- yin/ein > (sum(cases) - yin)/(sum(cases) - ein)
   
   #alternative glms use the same beta*X (beta from g0) (as an additional offset)
-  #and include an indicator for candidate zone
+  #and include an indicator variable for candidate zone
   
   #if there are no covariates, there is no additional offset
   if (dim(g0$model)[2] == 2){
@@ -48,11 +47,11 @@ glm_scan_stat <- function(cases,
   off_in <- smerc::nn.cumsum(nn, offset)
   off_out <- sum(offset) - off_in
   
-  #calculate alpha and beta for the glms
+  #calculate alpha and beta for the alternative glms
   alpha <- log((ty - yin)/off_out)
   beta <- log(yin/(ty-yin)) - log(off_in/off_out) 
   
-  #calculate fitted values with alternative models
+  #calculate fitted values for the alternative glms
   fitted_vals <- lapply(seq(1, length(alpha)), function(i){
     exp(alpha[i] + beta[i]*indmat[,i] + log(offset))
   })
