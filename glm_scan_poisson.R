@@ -170,9 +170,8 @@ coords <- matrix(c(nysf$x, nysf$y), ncol = 2)
 cases <- nysf$cases
 pop <- nysf$pop8
 ubpop <- 0.2
-nsim <- 50
+nsim <- 100
 
-#the output for this needs some work
 test <- glm_scan_test(formula = formula, family = family, data = data, coords = coords,
                       cases = cases, pop = pop, ubpop = ubpop, nsim =nsim)
 
