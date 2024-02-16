@@ -62,7 +62,14 @@ glm_scan_stat <- function(cases,
   #quasi-poisson likelihood function, this is undefined if there aren't any cases
   #in a region because of the log(y)
   qp <- function(y, mu, phi){
-    1/phi * (y*log(mu) - mu - y*log(y) + y)
+    if (min(mu) < 0) { 
+      stop("mu be have non-negative values")
+    }
+    tstat <- numeric(length(y)) #create vector of 0s
+    yind <- (y > 0) # tstat is 0 if y == 0, so only compute for y > 0
+    tstat[yind] <- 1/phi * (y[yind] * log(mu[yind]) - mu - y[yind] * log(y[yind]) + y[yind])
+    # 1/phi * (y*log(mu) - mu - y*log(y) + y)
+    return(tstat)
   }
   
   #indicator for which regions have cases
@@ -81,7 +88,7 @@ glm_scan_stat <- function(cases,
     sum(unname(qp(y = cases, mu = unlist(object), phi = phi_alt)[ind]))
   })
   
-  tobs = (f0sum - f1sums) * tstat_ind 
+  tobs = (f1sums - f0sum) * tstat_ind 
   
   return(tobs)
 }
@@ -186,7 +193,7 @@ coords <- matrix(c(nysf$x, nysf$y), ncol = 2)
 cases <- nysf$cases
 pop <- nysf$pop8
 ubpop <- 0.2
-nsim <- 500
+nsim <- 100
 
 test <- glm_scan_test(formula = formula, family = family, data = data, coords = coords,
                       cases = cases, pop = pop, ubpop = ubpop, nsim =nsim)
