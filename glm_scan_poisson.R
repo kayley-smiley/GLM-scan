@@ -78,11 +78,10 @@ glm_scan_test <- function(formula,
                           pop,
                           nsim = 499,
                           alpha = 0.1,
-                          pvalue = mc, #options: mc or gumbel
                           ubpop = 0.2,
                           longlat = FALSE, cl = NULL){
   
-  #ADD IN ARGUMENT CHECKING
+  #add in argument checking
   
   #setup
   cases <- floor(cases)
@@ -150,40 +149,16 @@ glm_scan_test <- function(formula,
   zones <- zones[-w0]
   tobs <- tobs[-w0]
   
-  if (pvalue == "mc"){
-    pvalue <- smerc::mc.pvalue(tobs, unlist(tsim))
-  }
-  
-  # if (pvalue == "gumbel"){
-  #   #to approximate the gumbel distribution, we need the sample mean and sample
-  #   #standard deviation for our generated test statistics
-  #   test_stats <- unlist(tsim)
-  #   
-  #   #method of moments estimators
-  #   mean <- mean(test_stats)
-  #   sd <- sd(test_stats)
-  #   beta_hat <- (sd * sqrt(6))/pi
-  #   mu_hat <- mean - (0.5772 * beta_hat)
-  #   
-  #   #approximate distribution, right-tailed
-  #   g_cdf <- function(x, mu, beta){
-  #     exp(-exp(-(x-mu)/beta))
-  #   }
-  #   
-  #   #p-value
-  #   pvalue <- unlist(unname(lapply(tobs, function(x){
-  #     1 - g_cdf(x = x, mu = mu_hat, beta = beta_hat)
-  #   })))
-  # }
-  
+  pvalue <- smerc::mc.pvalue(tobs, unlist(tsim))
+
   pruned <- smerc::sig_noc(tobs = tobs, zones = zones, pvalue = pvalue,
                            alpha = 0.1)
   
   return(pruned)
 }
 
-#test
 
+#test
 library(smerc)
 data(nysf)
 
@@ -195,17 +170,12 @@ coords <- matrix(c(nysf$x, nysf$y), ncol = 2)
 cases <- nysf$cases
 pop <- nysf$pop8
 ubpop <- 0.2
-pvalue <- "mc"
-nsim <- 500
+nsim <- 50
 
+#the output for this needs some work
 test <- glm_scan_test(formula = formula, family = family, data = data, coords = coords,
-                      cases = cases, pop = pop, ubpop = ubpop, pvalue = pvalue, 
-                      nsim =nsim)
-#only returning the MLC, not all significant ones, but it's the same as test_scan
+                      cases = cases, pop = pop, ubpop = ubpop, nsim =nsim)
 
-#compare to scan.test 
-test_scan <- scan.test(coords = coords, cases = cases, pop = pop, nsim = 1000, 
-                       alpha = 0.1, ubpop = 0.2)
 
 
 
