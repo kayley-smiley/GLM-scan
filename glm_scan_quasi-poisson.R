@@ -57,16 +57,28 @@ glm_scan_stat <- function(cases,
   })
   
   
-  #likelihood ratio calculations- NEED TO CHANGE THIS CHUNK to be the different likelihood functions
-  #also need to incorporate the phi? (overdispersion parameter)
-  f0sum <- (1/(sigma(g0)**2)) * sum(dpois(cases, lambda = fitted(g0), log = TRUE))
+  #likelihood ratio calculations
   
-  #need to feed it the dispersion parameter for each model and multiply accordingly 
+  #quasi-poisson likelihood function, this is undefined if there aren't any cases
+  #in a region because of the log(y)
+  qp <- function(y, mu, phi){
+    1/phi * (y*log(mu) - mu - y*log(y) + y)
+  }
+  
+  #indicator for which regions have cases
+  ind <- (cases > 0)
+  
+  #likelihood under the null hypothesis
+  phi0 <- sigma(g0)**2 #dispersion parameter for the null model
+  
+  f0sum <- sum(unname(qp(y = cases, mu = fitted(g0), phi = phi0)[ind]))
+  
+  #likelihood under the alternative hypotheses
   f1sums <- sapply(fitted_vals, function(object) {
-    phi <- (1/(length(cases)-2))*sum(((cases - unlist(object))**2)/unlist(object))
-    1/phi * sum(dpois(cases,
-              lambda = unlist(object),
-              log = TRUE))
+    #dispersion parameter for the model
+    phi_alt <- (1/(length(cases)-2))*sum(((cases - unlist(object))**2)/unlist(object))
+
+    sum(unname(qp(y = cases, mu = unlist(object), phi = phi_alt)[ind]))
   })
   
   tobs = (f0sum - f1sums) * tstat_ind 
@@ -83,7 +95,6 @@ glm_scan_test <- function(formula,
                           pop,
                           nsim = 499,
                           alpha = 0.1,
-                          pvalue = mc, #options: mc or gumbel?
                           ubpop = 0.2,
                           longlat = FALSE, cl = NULL){
   
@@ -154,31 +165,7 @@ glm_scan_test <- function(formula,
   zones <- zones[-w0]
   tobs <- tobs[-w0]
   
-  if (pvalue == "mc"){
-    pvalue <- smerc::mc.pvalue(tobs, unlist(tsim))
-  }
-  
-  # if (pvalue == "gumbel"){
-  #   #to approximate the gumbel distribution, we need the sample mean and sample
-  #   #standard deviation for our generated test statistics
-  #   test_stats <- unlist(tsim)
-  #   
-  #   #method of moments estimators
-  #   mean <- mean(test_stats)
-  #   sd <- sd(test_stats)
-  #   beta_hat <- (sd * sqrt(6))/pi
-  #   mu_hat <- mean - (0.5772 * beta_hat)
-  #   
-  #   #approximate distribution, right-tailed
-  #   g_cdf <- function(x, mu, beta){
-  #     exp(-exp(-(x-mu)/beta))
-  #   }
-  #   
-  #   #p-value
-  #   pvalue <- unlist(unname(lapply(tobs, function(x){
-  #     1 - g_cdf(x = x, mu = mu_hat, beta = beta_hat)
-  #   })))
-  # }
+  pvalue <- smerc::mc.pvalue(tobs, unlist(tsim))
   
   pruned <- smerc::sig_noc(tobs = tobs, zones = zones, pvalue = pvalue,
                            alpha = 0.1)
@@ -199,12 +186,10 @@ coords <- matrix(c(nysf$x, nysf$y), ncol = 2)
 cases <- nysf$cases
 pop <- nysf$pop8
 ubpop <- 0.2
-pvalue <- "mc"
-nsim <- 500
+nsim <- 100
 
 test <- glm_scan_test(formula = formula, family = family, data = data, coords = coords,
-                      cases = cases, pop = pop, ubpop = ubpop, pvalue = pvalue, 
-                      nsim =nsim)
+                      cases = cases, pop = pop, ubpop = ubpop, nsim =nsim)
 
 
 
