@@ -22,7 +22,8 @@ glm_scan_stat <- function(cases,
                           pop,
                           nn,
                           indmat,
-                          g0) {
+                          g0,
+                          case_ind) {
   
   #setup
   
@@ -44,11 +45,13 @@ glm_scan_stat <- function(cases,
   }
   
   #calculate the total offset in and outside of each zone
-  off_in <- smerc::nn.cumsum(nn, offset)
+  off_in <- smerc::nn.cumsum(nn, offset)[case_ind] #only zones with cases
   off_out <- sum(offset) - off_in
   
   #calculate alpha and beta for the alt glms
   alpha <- log((ty - yin)/off_out)
+  
+  #if a candidate zone has no cases, beta is negative infinity
   beta <- log(yin/(ty-yin)) - log(off_in/off_out) 
   
   #calculate fitted values for alternative models
@@ -65,27 +68,24 @@ glm_scan_stat <- function(cases,
     if (min(mu) < 0) { 
       stop("mu be have non-negative values")
     }
+    mu <- unname(mu) #get rid of the names for values in mu
     tstat <- numeric(length(y)) #create vector of 0s
     yind <- (y > 0) # tstat is 0 if y == 0, so only compute for y > 0
-    tstat[yind] <- 1/phi * (y[yind] * log(mu[yind]) - mu - y[yind] * log(y[yind]) + y[yind])
-    # 1/phi * (y*log(mu) - mu - y*log(y) + y)
+    tstat[yind] <- 1/phi * (y[yind] * log(mu[yind]) - mu[yind] - y[yind] * log(y[yind]) + y[yind])
     return(tstat)
   }
   
-  #indicator for which regions have cases
-  ind <- (cases > 0)
   
   #likelihood under the null hypothesis
   phi0 <- sigma(g0)**2 #dispersion parameter for the null model
   
-  f0sum <- sum(unname(qp(y = cases, mu = fitted(g0), phi = phi0)[ind]))
+  f0sum <- sum(unname(qp(y = cases, mu = fitted(g0), phi = phi0)))
   
   #likelihood under the alternative hypotheses
   f1sums <- sapply(fitted_vals, function(object) {
     #dispersion parameter for the model
     phi_alt <- (1/(length(cases)-2))*sum(((cases - unlist(object))**2)/unlist(object))
-
-    sum(unname(qp(y = cases, mu = unlist(object), phi = phi_alt)[ind]))
+    sum(unname(qp(y = cases, mu = unlist(object), phi = phi_alt)))
   })
   
   tobs = (f1sums - f0sum) * tstat_ind 
@@ -125,20 +125,28 @@ glm_scan_test <- function(formula,
   #candidate zone, each column represents a zone
   indmat <- zones2ind(zones, nregions = length(nn))
   
+  ty <- sum(cases) #sum of cases in the study area
+  yin <- smerc::nn.cumsum(nn, cases) #cases in the candidate zones
+  
+  
   #calculate null glm here and feed it to the tobs function instead of calculating
   #it in both functions
   g0 <- glm(formula = formula,
             offset = log(pop), data =  data, family = family)
   
-  #calculate things for glm_scan_stat function
+  #things for the glm_scan_stat function
   ex <- unname(g0$fitted.values)
   ein <- smerc::nn.cumsum(nn, ex)
-  ty <- sum(cases) #sum of cases in the study area
-  yin <- smerc::nn.cumsum(nn, cases)
   
-  tobs <- glm_scan_stat(cases = cases, ty = ty, yin = yin,
-                        ein = ein, pop = pop, nn = nn, indmat = indmat,
-                        g0 = g0)
+  #indicator for which zones have cases, because if a zone doesn't have cases
+  #we can remove it from the search
+  case_ind <- yin > 0 
+
+  #use glm_scan_stat function to calculate test statistics
+  #remove zones without cases from yin, ein, and indmat
+  tobs <- glm_scan_stat(cases = cases, ty = ty, yin = yin[case_ind],
+                        ein = ein[case_ind], pop = pop, nn = nn, indmat = indmat[, case_ind],
+                        g0 = g0, case_ind = case_ind)
   
   #p-value calculations
   #tsim calculation
@@ -156,9 +164,12 @@ glm_scan_test <- function(formula,
     ex <- unname(g0$fitted.values)
     ein <- smerc::nn.cumsum(nn, ex)
     
-    t <- glm_scan_stat(cases = ysim, ty = sum(ysim), yin = yin,
-                       ein = ein, pop = pop, nn = nn, indmat = indmat, 
-                       g0 = g0)
+    case_ind <- yin > 0 
+    
+    t <- glm_scan_stat(cases = ysim, ty = sum(ysim), yin = yin[case_ind],
+                       ein = ein[case_ind], pop = pop, nn = nn, indmat = indmat[, case_ind], 
+                       g0 = g0, case_ind = case_ind)
+    
     #return the max test stat
     max(t, na.rm = TRUE) #add in na.rm = TRUE, because there are zones with 
     #zero cases and this returns NA for the test stat
@@ -166,9 +177,9 @@ glm_scan_test <- function(formula,
   
   
   #detecting multiple clusters
-  wdup <- nndup(nn)
-  w0 <- which(tobs == 0 | yin == 0 | wdup)
-  zones <- nn2zones(nn)
+  wdup <- nndup(nn)[case_ind]
+  w0 <- which(tobs == 0 | wdup)
+  zones <- nn2zones(nn)[case_ind]
   zones <- zones[-w0]
   tobs <- tobs[-w0]
   
